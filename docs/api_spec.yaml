@@ -1,0 +1,142 @@
+openapi: 3.0.3
+info:
+  title: KaliSense AI API
+  description: |
+    Non-Invasive Serum Potassium Anomaly Detection API
+    非侵入式血鉀異常偵測 API
+    
+    Analyzes ECG waveforms to predict serum potassium (K⁺) anomaly risk
+    without blood sampling.
+  version: 1.0.0
+  contact:
+    email: contact@precisebiotech.ai
+
+servers:
+  - url: https://api.kalisense.ai/v1
+    description: Production server
+
+security:
+  - BearerAuth: []
+
+paths:
+  /analyze:
+    post:
+      summary: Submit ECG for potassium risk analysis
+      description: |
+        Submit a 12-lead or single-lead ECG recording and receive
+        real-time potassium anomaly risk classification and AIGC report.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnalyzeRequest'
+      responses:
+        '200':
+          description: Analysis result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalyzeResponse'
+        '401':
+          description: Unauthorized
+        '422':
+          description: Invalid ECG format
+
+  /report/{report_id}:
+    get:
+      summary: Retrieve AIGC-generated clinical report
+      parameters:
+        - name: report_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Clinical report (PDF or JSON)
+
+  /patients/{patient_id}/history:
+    get:
+      summary: Retrieve potassium risk trend history
+      description: Returns time-series potassium risk data for dialysis monitoring
+      parameters:
+        - name: patient_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Historical trend data
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+
+  schemas:
+    AnalyzeRequest:
+      type: object
+      required: [ecg_format, ecg_data]
+      properties:
+        ecg_format:
+          type: string
+          enum: [csv, edf, hl7]
+          description: Input ECG file format
+        leads:
+          type: integer
+          enum: [1, 3, 6, 12]
+          default: 12
+          description: Number of ECG leads
+        patient_id:
+          type: string
+          description: Anonymized patient identifier
+        ecg_data:
+          type: string
+          format: byte
+          description: Base64-encoded ECG data
+        sampling_rate:
+          type: integer
+          default: 500
+          description: ECG sampling rate in Hz
+
+    AnalyzeResponse:
+      type: object
+      properties:
+        analysis_id:
+          type: string
+        potassium_risk:
+          type: string
+          enum: [normal, hypokalemia, hyperkalemia]
+        risk_score:
+          type: number
+          format: float
+          description: Risk probability 0.0 - 1.0
+        estimated_k_range:
+          type: string
+          example: "5.5 - 6.5 mEq/L"
+        confidence:
+          type: number
+          format: float
+        ecg_findings:
+          type: array
+          items:
+            type: string
+          example: ["peaked T-waves", "prolonged PR interval"]
+        report_url:
+          type: string
+          description: URL to AIGC-generated clinical report
+        processing_time_ms:
+          type: integer
